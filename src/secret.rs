@@ -13,11 +13,18 @@ pub struct PrivateKey(SecretKey);
 impl PrivateKey {
     /// Derives a private key from a mnemonic seed phrase.
     pub fn from_mnemonic(seed_phrase: impl AsRef<str>) -> Result<Self> {
+        Self::from_mnemonic_at_index(seed_phrase, 0)
+    }
+
+    /// Derives a private key from a mnemonic seed phrase at the specified HD
+    /// wallet index.
+    pub fn from_mnemonic_at_index(seed_phrase: impl AsRef<str>, index: usize) -> Result<Self> {
         let password = "";
         let mnemonic = Mnemonic::from_phrase(seed_phrase.as_ref(), Language::English)?;
         let seed = Seed::new(&mnemonic, password);
 
-        let derived_key = ExtendedPrivKey::derive(seed.as_bytes(), "m/44'/60'/0'/0/0")
+        let hd_path = format!("m/44'/60'/0'/0/{}", index);
+        let derived_key = ExtendedPrivKey::derive(seed.as_bytes(), &*hd_path)
             .map_err(|_| anyhow!("failed to derive key from seed"))?;
         let key = SecretKey::from_slice(&derived_key.secret())?;
 
@@ -86,6 +93,17 @@ mod tests {
             key.address(),
             hex!("90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"),
         );
+    }
+
+    #[test]
+    fn ganache_determinitic_nth_address() {
+        for (index, address) in &[
+            (1, hex!("FFcf8FDEE72ac11b5c542428B35EEF5769C409f0")),
+            (42, hex!("4b930E7b3E491e37EaB48eCC8a667c59e307ef20")),
+        ] {
+            let key = PrivateKey::from_mnemonic_at_index(DETERMINISTIC_MNEMONIC, *index).unwrap();
+            assert_eq!(key.address(), *address);
+        }
     }
 
     #[test]
