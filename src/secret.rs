@@ -1,10 +1,11 @@
-use crate::hash;
+use crate::{address::Address, hash, safe::data::Signature};
 use anyhow::{anyhow, Result};
 use bip39::{Language, Mnemonic, Seed};
 use secp256k1::{
-    key::{PublicKey, SecretKey},
+    key::{PublicKey, SecretKey, ONE_KEY},
     Message, Secp256k1,
 };
+use std::fmt::{self, Debug, Formatter};
 use tiny_hderive::bip32::ExtendedPrivKey;
 
 /// A struct representing an Ethereum private key.
@@ -32,7 +33,7 @@ impl PrivateKey {
     }
 
     /// Returns the public address for the private key.
-    pub fn address(&self) -> [u8; 20] {
+    pub fn address(&self) -> Address {
         let secp = Secp256k1::signing_only();
         let public_key = PublicKey::from_secret_key(&secp, &self.0).serialize_uncompressed();
 
@@ -43,10 +44,7 @@ impl PrivateKey {
         // calculation.
         debug_assert_eq!(public_key[0], 0x04);
         let hash = hash::keccak256(&public_key[1..]);
-
-        let mut address = [0u8; 20];
-        address.copy_from_slice(&hash[12..]);
-        address
+        Address::from_slice(&hash[12..])
     }
 
     /// Generate a signature for the specified message.
@@ -67,15 +65,16 @@ impl PrivateKey {
     }
 }
 
-/// A recoverable signature in electrum notation.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Signature {
-    /// Signature V value in electrum notation (either 27 or 28).
-    pub v: u8,
-    /// Signature R value.
-    pub r: [u8; 32],
-    /// Normalized signature S value, with `s < n/2 - 1`.
-    pub s: [u8; 32],
+impl Debug for PrivateKey {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.debug_tuple("PrivateKey").field(&self.address()).finish()
+    }
+}
+
+impl Drop for PrivateKey {
+    fn drop(&mut self) {
+        self.0 = ONE_KEY
+    }
 }
 
 #[cfg(test)]
@@ -83,14 +82,14 @@ mod tests {
     use super::*;
     use hex_literal::hex;
 
-    const DETERMINISTIC_MNEMONIC: &str =
+    const GANACHE_DETERMINISTIC_MNEMONIC: &str =
         "myth like bonus scare over problem client lizard pioneer submit female collect";
 
     #[test]
     fn ganache_determinitic_address() {
-        let key = PrivateKey::from_mnemonic(DETERMINISTIC_MNEMONIC).unwrap();
+        let key = PrivateKey::from_mnemonic(GANACHE_DETERMINISTIC_MNEMONIC).unwrap();
         assert_eq!(
-            key.address(),
+            *key.address(),
             hex!("90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"),
         );
     }
@@ -101,14 +100,15 @@ mod tests {
             (1, hex!("FFcf8FDEE72ac11b5c542428B35EEF5769C409f0")),
             (42, hex!("4b930E7b3E491e37EaB48eCC8a667c59e307ef20")),
         ] {
-            let key = PrivateKey::from_mnemonic_at_index(DETERMINISTIC_MNEMONIC, *index).unwrap();
-            assert_eq!(key.address(), *address);
+            let key =
+                PrivateKey::from_mnemonic_at_index(GANACHE_DETERMINISTIC_MNEMONIC, *index).unwrap();
+            assert_eq!(*key.address(), *address);
         }
     }
 
     #[test]
     fn ganache_deterministic_signature() {
-        let key = PrivateKey::from_mnemonic(DETERMINISTIC_MNEMONIC).unwrap();
+        let key = PrivateKey::from_mnemonic(GANACHE_DETERMINISTIC_MNEMONIC).unwrap();
         let message = hash::keccak256(b"\x19Ethereum Signed Message:\n12Hello World!");
         assert_eq!(
             key.sign(message),

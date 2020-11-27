@@ -7,8 +7,16 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 anyhow = "1"
+curl = "0.4"
+hex = "0.4"
+rpassword = "5"
 secp256k1 = { version = "0.19", features = ["recovery"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+serde_repr = "0.1"
+serde_with = { version = "1", features = ["hex"] }
 sha3 = "0.9"
+structopt = "0.3"
 tiny-bip39 = "0.8"
 tiny-hderive = "0.2"
 
