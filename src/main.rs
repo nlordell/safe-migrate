@@ -1,4 +1,5 @@
 mod address;
+mod etherscan;
 mod hash;
 mod safe;
 mod secret;
@@ -64,7 +65,8 @@ fn run(options: Options) -> Result<()> {
     println!("  - {}", recovery_key.address());
     println!("  - {}", secondary_recovery_address);
 
-    let client = Client::for_network(options.network.unwrap_or(Network::Rinkeby));
+    let network = options.network.unwrap_or(Network::Rinkeby);
+    let client = Client::for_network(network);
 
     let info = client.get_safe(options.safe)?;
     {
@@ -128,7 +130,9 @@ fn run(options: Options) -> Result<()> {
     println!("Using signature {}", signed_tx.signatures[0]);
     term::confirm("Are absolutely positively undoubtedly sure")?;
 
-    client.post_transaction(signed_tx)?;
+    let executed_tx = client.post_transaction(signed_tx)?;
+    println!("Transaction successfully relayed:");
+    println!("{}", etherscan::render_link(network, &executed_tx));
 
     Ok(())
 }

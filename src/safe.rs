@@ -59,13 +59,12 @@ impl Client {
         )
     }
 
-    /// Posts a signed transaction to the relay service for execution.
-    pub fn post_transaction(&self, tx: SignedSafeTransaction) -> Result<()> {
-        let result: serde_json::Value = http::post_json(
+    /// Posts a signed transaction to the relay service for execution and
+    /// returns details of the transaction execution.
+    pub fn post_transaction(&self, tx: SignedSafeTransaction) -> Result<ExecutedTransaction> {
+        http::post_json(
             format!("{}/v1/safes/{}/transactions/", self.relay, tx.safe),
             &tx,
-        )?;
-        println!("{}", result);
-        Ok(())
+        )
     }
 }

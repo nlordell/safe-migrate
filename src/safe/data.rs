@@ -129,8 +129,36 @@ impl Display for Signature {
     }
 }
 
+/// A transaction being executed by the relay service.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutedTransaction {
+    /// The hash of the transaction that was subimitted to the blockchain.
+    #[serde(with = "prefixed_hex")]
+    pub transaction_hash: [u8; 32],
+}
+
 mod prefixed_hex {
-    use serde::ser::Serializer;
+    use serde::{
+        de::{Deserialize, Deserializer, Error as _},
+        ser::Serializer,
+    };
+    use std::borrow::Cow;
+
+    pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+    where
+        T: Default + AsMut<[u8]>,
+        D: Deserializer<'de>,
+    {
+        let string = Cow::<str>::deserialize(deserializer)?;
+        if !string.starts_with("0x") {
+            return Err(D::Error::custom("missing '0x' prefix"));
+        }
+
+        let mut result = T::default();
+        hex::decode_to_slice(&string[2..], result.as_mut()).map_err(D::Error::custom)?;
+        Ok(result)
+    }
 
     pub fn serialize<T, S>(value: T, serializer: S) -> Result<S::Ok, S::Error>
     where
